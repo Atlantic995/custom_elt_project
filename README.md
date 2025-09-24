@@ -68,5 +68,6 @@ To configure the CRON job:
 
 &nbsp;   You can adjust the time as needed within the Dockerfile found in the elt\_script folder.
 
-
+<img src="https://raw.githubusercontent.com/Atlantic995/custom_elt_project/refs/heads/main/Untitled.png" alt="img1">
+<img src="https://raw.githubusercontent.com/Atlantic995/custom_elt_project/refs/heads/main/Untitled2.jpg" alt="img2">
 
