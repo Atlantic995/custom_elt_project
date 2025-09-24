@@ -1,0 +1,157 @@
+services:
+  source_postgres:
+    image: postgres:15
+    ports:
+      - '5433:5432'
+    networks:
+      - elt_network
+    environment:
+      POSTGRES_DB: source_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - ./source_db_init/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  destination_postgres:
+    image: postgres:15
+    ports:
+      - '5434:5432'
+    networks:
+      - elt_network
+    environment:
+      POSTGRES_DB: destination_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+
+# elt_script will not run until source_db and destination_db are initialized
+# thanks to depends_on: line
+# etl script that was used Pre  Apache Airflow
+  # elt_script:
+  #   build:
+  #     context: ./elt # Directory containing the Dockerfile and elt_script.py
+  #     dockerfile: Dockerfile # Name of the Dockerfile, if it's something other than "Dockerfile", specify here
+  #   command: ['python', 'elt_script.py']
+  #   networks:
+  #     - elt_network
+  #   depends_on:
+  #     - source_postgres
+  #     - destination_postgres
+  # dbt:
+  #   image: ghcr.io/dbt-labs/dbt-postgres:latest
+  #   command:
+  #     [
+  #       "run",
+  #       "--profiles-dir",
+  #       "/root/.dbt",
+  #       "--project-dir",
+  #       "/dbt"
+  #     ]
+  #   networks:
+  #   - elt_network
+  #   volumes:
+  #     - ./custom_postgres:/dbt
+  #     - ./dbt:/root/.dbt
+  #   depends_on:
+  #     - elt_script
+  #   environment:
+  #     DBT_PROFILE: default
+  #     DBT_TARGET: dev
+
+
+# new  postgres db for airflow logs
+  postgres:
+    image: postgres:latest
+    networks:
+      - elt_network
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+
+
+  init-airflow:
+    image: apache/airflow:2.8.1
+    depends_on:
+      - postgres
+    networks:
+      - elt_network
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    command: >
+      bash -c "airflow db migrate &&
+               airflow users create --username airflow --password password --firstname John --lastname Doe --role Admin --email admin@example.com"
+  webserver:
+    image: apache/airflow:2.8.1
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: root
+    depends_on:
+    - postgres
+    - init-airflow 
+    networks:
+    - elt_network
+    extra_hosts:
+    - "host.docker.internal:host-gateway"
+    volumes:
+    - ./airflow/dags:/opt/airflow/dags # we need to finds dags, folder is mapped to airflow
+    - ./elt_script:/opt/airflow/elt_script
+    - ./custom_postgres:/opt/dbt
+    - ./.dbt:/root/.dbt
+    - /var/run/docker.sock:/var/run/docker.sock # aiflow access to docker network
+    environment:
+    - LOAD_EX=n
+    - EXECUTOR=Local
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    - AIRFLOw__CORE__FERNET_KEY=BAYW1S5uYV8zJJmac03jdaHcBB4Ler36vvORWI7IbIA= #encrypts the user login/password
+    - AIRFLOW__WEBSERVER__DEFAULT__USER_USERNAME=airflow
+    - AIRFLOW__WEBSERVER__DEFAULT__USER_PASSWORD=password
+    - AIRFLOW_WWW_USER_USERNAME=airflow
+    - AIRFLOW_WWW_USER_PASSWORD=password
+    - AIRFLOW__WEBSERVER__SECRET_KEY=secret
+    ports:
+    - "8080:8080"
+    command: webserver
+
+
+      
+  scheduler:
+    image: apache/airflow:2.8.1
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: root
+    depends_on:
+    - postgres
+    - init-airflow
+    networks:
+    - elt_network
+    extra_hosts:
+    - "host.docker.internal:host-gateway" #Adds a custom hostname entry to the container's /etc/hosts file.
+    volumes:
+    - ./airflow/dags:/opt/airflow/dags # Mounts the local 'airflow/dags' directory to the container's '/opt/airflow/dags'. This allows Airflow to findDAG files.
+    - ./elt_script:/opt/airflow/elt_script # Mounts the local 'elt' directory for any custom scripts or modules used by the DAGs.
+    - ./custom_postgres:/opt/dbt 
+    - ./.dbt:/root/.dbt
+    - /var/run/docker.sock:/var/run/docker.sock # aiflow access to docker network
+    environment:
+    - LOAD_EX=n #Sets environment variables inside the container.
+    - EXECUTOR=Local #Airflow-specific variable to prevent loading of example DAGs.
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow #Configures Airflow to run tasks on the local scheduler, rather than a remote worker.
+    - AIRFLOW_CONN_DESTINATION_POSTGRES=postgres://postgres:secret@destination_postgres:5434/destination_db
+    - AIRFLOw__CORE__FERNET_KEY=BAYW1S5uYV8zJJmac03jdaHcBB4Ler36vvORWI7IbIA= #encrypts the user login/password
+    - AIRFLOW__WEBSERVER__DEFAULT__USER_USERNAME=airflow
+    - AIRFLOW__WEBSERVER__DEFAULT__USER_PASSWORD=password
+    - AIRFLOW_WWW_USER_USERNAME=airflow
+    - AIRFLOW_WWW_USER_PASSWORD=password
+    - AIRFLOW__WEBSERVER__SECRET_KEY=secret
+    command: scheduler
+
+
+
+
+
+networks:
+  elt_network:
+    driver: bridge
+
