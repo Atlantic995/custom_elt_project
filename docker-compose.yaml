@@ -103,7 +103,7 @@ services:
     - LOAD_EX=n
     - EXECUTOR=Local
     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-    - AIRFLOw__CORE__FERNET_KEY=BAYW1S5uYV8zJJmac03jdaHcBB4Ler36vvORWI7IbIA= #encrypts the user login/password
+    - AIRFLOw__CORE__FERNET_KEY== #encrypts the user login/password
     - AIRFLOW__WEBSERVER__DEFAULT__USER_USERNAME=airflow
     - AIRFLOW__WEBSERVER__DEFAULT__USER_PASSWORD=password
     - AIRFLOW_WWW_USER_USERNAME=airflow
@@ -139,7 +139,7 @@ services:
     - EXECUTOR=Local #Airflow-specific variable to prevent loading of example DAGs.
     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow #Configures Airflow to run tasks on the local scheduler, rather than a remote worker.
     - AIRFLOW_CONN_DESTINATION_POSTGRES=postgres://postgres:secret@destination_postgres:5434/destination_db
-    - AIRFLOw__CORE__FERNET_KEY=BAYW1S5uYV8zJJmac03jdaHcBB4Ler36vvORWI7IbIA= #encrypts the user login/password
+    - AIRFLOw__CORE__FERNET_KEY= #encrypts the user login/password
     - AIRFLOW__WEBSERVER__DEFAULT__USER_USERNAME=airflow
     - AIRFLOW__WEBSERVER__DEFAULT__USER_PASSWORD=password
     - AIRFLOW_WWW_USER_USERNAME=airflow
