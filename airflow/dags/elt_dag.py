@@ -5,6 +5,9 @@ from airflow.operators.python_operator import PythonOperator
 from airflow.operators.bash import BashOperator
 from airflow.providers.docker.operators.docker import DockerOperator
 import subprocess
+from cryptography.fernet import Fernet
+
+NEW_KEY = Fernet.generate_key().decode()
 
 default_args = {
     'owner':'airflow',
